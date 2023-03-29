@@ -13,18 +13,25 @@ to8b = lambda x : (255*np.clip(x,0,1)).astype(np.uint8)
 
 # Positional encoding (section 5.1)
 class Embedder:
+    """
+    给定空间位置(x, y, z)对应得到高纬度的编码位置p=(p1, p2, p3,...,pk)使MLP易学习
+    Embed(x,y,z)=[sin(2^0 πx),cos(2^0 πx),...,sin(2^(K-1) πx),cos(2^(K-1) πx),
+    """
     def __init__(self, **kwargs):
         self.kwargs = kwargs
         self.create_embedding_fn()
-        
+
+    # 创建embedding函数
     def create_embedding_fn(self):
+        # 定义空的embedding函数列表和输出维度
         embed_fns = []
         d = self.kwargs['input_dims']
         out_dim = 0
+        # 如果包含输入，则添加一个恒等函数，并更新输出维度
         if self.kwargs['include_input']:
             embed_fns.append(lambda x : x)
             out_dim += d
-            
+        # 根据输入参数设置embedding函数的各种参数
         max_freq = self.kwargs['max_freq_log2']
         N_freqs = self.kwargs['num_freqs']
         
@@ -32,32 +39,37 @@ class Embedder:
             freq_bands = 2.**torch.linspace(0., max_freq, steps=N_freqs)
         else:
             freq_bands = torch.linspace(2.**0., 2.**max_freq, steps=N_freqs)
-            
+        # 添加不同频率的周期函数到embedding函数列表中，并累加输出维度
         for freq in freq_bands:
             for p_fn in self.kwargs['periodic_fns']:
+                # 使用lambda函数定义embedding函数，每个embedding函数将输入的每个维度乘上不同的频率，再使用周期函数进行变换
+                # 将得到的结果添加到embedding函数列表中
                 embed_fns.append(lambda x, p_fn=p_fn, freq=freq : p_fn(x * freq))
                 out_dim += d
-                    
+        # 将embedding函数列表和输出维度分别赋值给类的两个成员变量
         self.embed_fns = embed_fns
         self.out_dim = out_dim
-        
+
+    # 对输入进行embedding操作
     def embed(self, inputs):
+        # 遍历embedding函数列表，将输入的每一维度都分别传递给相应的embedding函数
+        # 并将所有函数的输出按最后一维拼接起来，形成最终的输出
         return torch.cat([fn(inputs) for fn in self.embed_fns], -1)
 
 
 def get_embedder(multires, i=0):
-    if i == -1:
+    if i == -1: # 如果i为-1，返回恒等映射和输入通道数为3
         return nn.Identity(), 3
-    
+    # 定义embedding函数的参数
     embed_kwargs = {
-                'include_input' : True,
-                'input_dims' : 3,
-                'max_freq_log2' : multires-1,
-                'num_freqs' : multires,
-                'log_sampling' : True,
-                'periodic_fns' : [torch.sin, torch.cos],
+                'include_input' : True,         # 是否包含输入信息
+                'input_dims' : 3,               # 输入通道数
+                'max_freq_log2' : multires-1,   # 最大频率
+                'num_freqs' : multires,         # 频率数量
+                'log_sampling' : True,          # 是否使用对数采样
+                'periodic_fns' : [torch.sin, torch.cos],# 周期函数
     }
-    
+    # 创建Embedder对象并定义embedding函数
     embedder_obj = Embedder(**embed_kwargs)
     embed = lambda x, eo=embedder_obj : eo.embed(x)
     return embed, embedder_obj.out_dim
@@ -66,8 +78,7 @@ def get_embedder(multires, i=0):
 # Model
 class NeRF(nn.Module):
     def __init__(self, D=8, W=256, input_ch=3, input_ch_views=3, output_ch=4, skips=[4], use_viewdirs=False):
-        """ 
-        """
+        """定义NeRF的MLP模型"""
         super(NeRF, self).__init__()
         self.D = D
         self.W = W
@@ -76,24 +87,28 @@ class NeRF(nn.Module):
         self.skips = skips
         self.use_viewdirs = use_viewdirs
         
+        # 对输入点的全连接层
         self.pts_linears = nn.ModuleList(
             [nn.Linear(input_ch, W)] + [nn.Linear(W, W) if i not in self.skips else nn.Linear(W + input_ch, W) for i in range(D-1)])
         
-        ### Implementation according to the official code release (https://github.com/bmild/nerf/blob/master/run_nerf_helpers.py#L104-L105)
+        # 对视角的全连接层
         self.views_linears = nn.ModuleList([nn.Linear(input_ch_views + W, W//2)])
 
         ### Implementation according to the paper
         # self.views_linears = nn.ModuleList(
         #     [nn.Linear(input_ch_views + W, W//2)] + [nn.Linear(W//2, W//2) for i in range(D//2)])
         
+        # 若使用视角，则分别计算透明度、颜色和视角特征
         if use_viewdirs:
             self.feature_linear = nn.Linear(W, W)
             self.alpha_linear = nn.Linear(W, 1)
             self.rgb_linear = nn.Linear(W//2, 3)
         else:
+            # 不使用视角，则直接计算输出
             self.output_linear = nn.Linear(W, output_ch)
 
     def forward(self, x):
+        # 拆分输入的点和视角信息
         input_pts, input_views = torch.split(x, [self.input_ch, self.input_ch_views], dim=-1)
         h = input_pts
         for i, l in enumerate(self.pts_linears):
@@ -103,6 +118,7 @@ class NeRF(nn.Module):
                 h = torch.cat([input_pts, h], -1)
 
         if self.use_viewdirs:
+            # 分别计算透明度、颜色和视角特征
             alpha = self.alpha_linear(h)
             feature = self.feature_linear(h)
             h = torch.cat([feature, input_views], -1)
@@ -114,16 +130,21 @@ class NeRF(nn.Module):
             rgb = self.rgb_linear(h)
             outputs = torch.cat([rgb, alpha], -1)
         else:
+            # 直接计算输出
             outputs = self.output_linear(h)
 
         return outputs    
 
     def load_weights_from_keras(self, weights):
+        """将从 Keras 模型中获取的权重加载到当前 PyTorch 模型中。
+        @param: weights: numpy.ndarray，包含从 Keras 模型获取的权重的 numpy 数组。
+        """
         assert self.use_viewdirs, "Not implemented if use_viewdirs=False"
         
         # Load pts_linears
         for i in range(self.D):
             idx_pts_linears = 2 * i
+            # 从 numpy 数组中读取当前层的权重，然后将它们转换为 torch.Tensor 类型，并将其赋值给当前层的权重。
             self.pts_linears[i].weight.data = torch.from_numpy(np.transpose(weights[idx_pts_linears]))    
             self.pts_linears[i].bias.data = torch.from_numpy(np.transpose(weights[idx_pts_linears+1]))
         

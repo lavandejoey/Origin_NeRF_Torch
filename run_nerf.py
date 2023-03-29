@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from tqdm import tqdm, trange
-
+import logging
 import matplotlib.pyplot as plt
 
 from run_nerf_helpers import *
@@ -23,6 +23,14 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 np.random.seed(0)
 DEBUG = False
 
+# 配置日志记录器
+file_handler = logging.FileHandler(log_file)
+file_handler.setLevel(logging.INFO)
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(formatter)
+
 
 def batchify(fn, chunk):
     """Constructs a version of 'fn' that applies to smaller batches.
@@ -35,7 +43,14 @@ def batchify(fn, chunk):
 
 
 def run_network(inputs, viewdirs, fn, embed_fn, embeddirs_fn, netchunk=1024*64):
-    """Prepares inputs and applies network 'fn'.
+    """准备输入并应用网络 'fn'。
+    @param: inputs (torch.Tensor): 输入张量，形状为 [batch_size, ... , input_ch]。
+    @param: viewdirs (torch.Tensor): 观察方向张量，形状为 [batch_size, ... , input_ch_views]。
+    @param: fn (torch.nn.Module): 要应用的网络模型。
+    @param: embed_fn (function): 将输入张量嵌入到特征空间中的函数。
+    @param: embeddirs_fn (function): 将观察方向张量嵌入到特征空间中的函数。
+    @param: netchunk (int): 网络处理数据块大小。
+    @returns: torch.Tensor: 经过网络 fn 处理后的输出张量，形状与输入张量相同。
     """
     inputs_flat = torch.reshape(inputs, [-1, inputs.shape[-1]])
     embedded = embed_fn(inputs_flat)
@@ -176,21 +191,27 @@ def render_path(render_poses, hwf, K, chunk, render_kwargs, gt_imgs=None, savedi
 
 
 def create_nerf(args):
-    """Instantiate NeRF's MLP model.
-    """
+    """创建NeRF的多层感知器模型"""
+    # 获取embedding函数和输入通道数(from run_nerf_helpers.py)
     embed_fn, input_ch = get_embedder(args.multires, args.i_embed)
 
+    # 初始化视点embedding函数和输入通道数
     input_ch_views = 0
     embeddirs_fn = None
     if args.use_viewdirs:
         embeddirs_fn, input_ch_views = get_embedder(args.multires_views, args.i_embed)
+
+    # 输出通道数（如果使用fine模型，则输出通道数为5，否则为4）
     output_ch = 5 if args.N_importance > 0 else 4
     skips = [4]
+
+    # 创建NeRF模型
     model = NeRF(D=args.netdepth, W=args.netwidth,
                  input_ch=input_ch, output_ch=output_ch, skips=skips,
                  input_ch_views=input_ch_views, use_viewdirs=args.use_viewdirs).to(device)
     grad_vars = list(model.parameters())
 
+    # 如果使用了fine模型，则创建fine模型
     model_fine = None
     if args.N_importance > 0:
         model_fine = NeRF(D=args.netdepth_fine, W=args.netwidth_fine,
@@ -198,12 +219,13 @@ def create_nerf(args):
                           input_ch_views=input_ch_views, use_viewdirs=args.use_viewdirs).to(device)
         grad_vars += list(model_fine.parameters())
 
-    network_query_fn = lambda inputs, viewdirs, network_fn : run_network(inputs, viewdirs, network_fn,
-                                                                embed_fn=embed_fn,
-                                                                embeddirs_fn=embeddirs_fn,
-                                                                netchunk=args.netchunk)
+    # 定义网络查询函数
+    network_query_fn = lambda inputs, viewdirs, network_fn: run_network(inputs, viewdirs, network_fn,
+                                                                         embed_fn=embed_fn,
+                                                                         embeddirs_fn=embeddirs_fn,
+                                                                         netchunk=args.netchunk)
 
-    # Create optimizer
+    # 创建优化器
     optimizer = torch.optim.Adam(params=grad_vars, lr=args.lrate, betas=(0.9, 0.999))
 
     start = 0
@@ -212,8 +234,8 @@ def create_nerf(args):
 
     ##########################
 
-    # Load checkpoints
-    if args.ft_path is not None and args.ft_path!='None':
+    # 加载检查点
+    if args.ft_path is not None and args.ft_path != 'None':
         ckpts = [args.ft_path]
     else:
         ckpts = [os.path.join(basedir, expname, f) for f in sorted(os.listdir(os.path.join(basedir, expname))) if 'tar' in f]
@@ -227,7 +249,7 @@ def create_nerf(args):
         start = ckpt['global_step']
         optimizer.load_state_dict(ckpt['optimizer_state_dict'])
 
-        # Load model
+        # 加载模型
         model.load_state_dict(ckpt['network_fn_state_dict'])
         if model_fine is not None:
             model_fine.load_state_dict(ckpt['network_fine_state_dict'])
@@ -235,24 +257,24 @@ def create_nerf(args):
     ##########################
 
     render_kwargs_train = {
-        'network_query_fn' : network_query_fn,
-        'perturb' : args.perturb,
-        'N_importance' : args.N_importance,
-        'network_fine' : model_fine,
-        'N_samples' : args.N_samples,
-        'network_fn' : model,
-        'use_viewdirs' : args.use_viewdirs,
-        'white_bkgd' : args.white_bkgd,
-        'raw_noise_std' : args.raw_noise_std,
+        'network_query_fn': network_query_fn,
+        'perturb': args.perturb,
+        'N_importance': args.N_importance,
+        'network_fine': model_fine,
+        'N_samples': args.N_samples,
+        'network_fn': model,
+        'use_viewdirs': args.use_viewdirs,
+        'white_bkgd': args.white_bkgd,
+        'raw_noise_std': args.raw_noise_std,
     }
 
-    # NDC only good for LLFF-style forward facing data
+    # 只有LLFF格式的前向数据才适用NDC
     if args.dataset_type != 'llff' or args.no_ndc:
         print('Not ndc!')
         render_kwargs_train['ndc'] = False
         render_kwargs_train['lindisp'] = args.lindisp
 
-    render_kwargs_test = {k : render_kwargs_train[k] for k in render_kwargs_train}
+    render_kwargs_test = {k: render_kwargs_train[k] for k in render_kwargs_train}
     render_kwargs_test['perturb'] = False
     render_kwargs_test['raw_noise_std'] = 0.
 
@@ -536,32 +558,39 @@ def train():
     parser = config_parser()
     args = parser.parse_args()
 
-    # Load data
+    # 加载数据
     K = None
-    if args.dataset_type == 'llff':
+    if args.dataset_type == 'llff':  # 如果是llff格式的数据集
+        # 加载图片、相机位姿、相机焦距、渲染相机位姿、测试图片的索引
         images, poses, bds, render_poses, i_test = load_llff_data(args.datadir, args.factor,
-                                                                  recenter=True, bd_factor=.75,
-                                                                  spherify=args.spherify)
-        hwf = poses[0,:3,-1]
-        poses = poses[:,:3,:4]
-        print('Loaded llff', images.shape, render_poses.shape, hwf, args.datadir)
+                                                                recenter=True, bd_factor=.75,
+                                                                spherify=args.spherify)
+        # 获取相机参数
+        hwf = poses[0, :3, -1]
+        # 从poses数组中提取出旋转和平移信息
+        poses = poses[:, :3, :4]
+        print(f"Loaded llff, img:{images.shape}, render poses{render_poses.shape}, hwf:{hwf}, datadir:{args.datadir}")
+
+        # 如果i_test不是一个列表，将其转化为列表形式
         if not isinstance(i_test, list):
             i_test = [i_test]
 
+        # 根据llffhold的值来分割数据集
         if args.llffhold > 0:
             print('Auto LLFF holdout,', args.llffhold)
             i_test = np.arange(images.shape[0])[::args.llffhold]
 
+        # 确定训练集、验证集和测试集的索引
         i_val = i_test
         i_train = np.array([i for i in np.arange(int(images.shape[0])) if
-                        (i not in i_test and i not in i_val)])
+                            (i not in i_test and i not in i_val)])
 
+        # 定义场景的空间范围（near和far）
         print('DEFINING BOUNDS')
-        if args.no_ndc:
+        if args.no_ndc: # 如果不使用归一化坐标系，使用数据集中深度范围的90%作为near，深度范围的最大值作为far
             near = np.ndarray.min(bds) * .9
             far = np.ndarray.max(bds) * 1.
-            
-        else:
+        else: # 否则near为0，far为1
             near = 0.
             far = 1.
         print('NEAR FAR', near, far)
@@ -607,11 +636,12 @@ def train():
         print('Unknown dataset type', args.dataset_type, 'exiting')
         return
 
-    # Cast intrinsics to right types
-    H, W, focal = hwf
+    # 将相机内参转换为正确的数据类型
+    H, W, focal = hwf # 相机成像高、宽、焦距
     H, W = int(H), int(W)
     hwf = [H, W, focal]
 
+    # 如果K为空，使用默认相机内参(LINEMOD 数据带有相机内参矩阵K)
     if K is None:
         K = np.array([
             [focal, 0, 0.5*W],
@@ -619,54 +649,61 @@ def train():
             [0, 0, 1]
         ])
 
+    # 如果需要渲染测试集中的图片，则使用测试集的相机位姿
     if args.render_test:
         render_poses = np.array(poses[i_test])
 
     # Create log dir and copy the config file
-    basedir = args.basedir
-    expname = args.expname
-    os.makedirs(os.path.join(basedir, expname), exist_ok=True)
-    f = os.path.join(basedir, expname, 'args.txt')
+    basedir = args.basedir  # 日志目录
+    expname = args.expname  # 实验名称
+    os.makedirs(os.path.join(basedir, expname), exist_ok=True)  # 如果目录不存在，则创建一个日志目录
+    f = os.path.join(basedir, expname, 'args.txt')  # 存储命令行参数的文本文件的路径
     with open(f, 'w') as file:
         for arg in sorted(vars(args)):
             attr = getattr(args, arg)
-            file.write('{} = {}\n'.format(arg, attr))
+            file.write('{} = {}\n'.format(arg, attr))  # 将每个命令行参数和其值写入文本文件中
     if args.config is not None:
-        f = os.path.join(basedir, expname, 'config.txt')
+        f = os.path.join(basedir, expname, 'config.txt')  # 存储配置文件的文本文件的路径
         with open(f, 'w') as file:
-            file.write(open(args.config, 'r').read())
+            file.write(open(args.config, 'r').read())  # 将配置文件内容写入文本文件中
 
-    # Create nerf model
+    # 创建NERF模型
     render_kwargs_train, render_kwargs_test, start, grad_vars, optimizer = create_nerf(args)
     global_step = start
 
+    # 定义场景空间范围
     bds_dict = {
-        'near' : near,
-        'far' : far,
+        'near': near,
+        'far': far,
     }
+    # 将场景空间范围加入渲染参数
     render_kwargs_train.update(bds_dict)
     render_kwargs_test.update(bds_dict)
 
-    # Move testing data to GPU
+    # 将测试数据移动到GPU上
     render_poses = torch.Tensor(render_poses).to(device)
 
-    # Short circuit if only rendering out from trained model
+    # 如果只是从已经训练好的模型中进行渲染，则直接进行渲染
     if args.render_only:
         print('RENDER ONLY')
         with torch.no_grad():
             if args.render_test:
-                # render_test switches to test poses
+                # 使用测试集的数据进行渲染
                 images = images[i_test]
             else:
-                # Default is smoother render_poses path
+                # 默认使用较为平滑的渲染路径
                 images = None
 
+            # 定义渲染结果的保存目录
             testsavedir = os.path.join(basedir, expname, 'renderonly_{}_{:06d}'.format('test' if args.render_test else 'path', start))
             os.makedirs(testsavedir, exist_ok=True)
             print('test poses shape', render_poses.shape)
 
+            # 渲染路径，并将结果保存在testsavedir中
             rgbs, _ = render_path(render_poses, hwf, K, args.chunk, render_kwargs_test, gt_imgs=images, savedir=testsavedir, render_factor=args.render_factor)
             print('Done rendering', testsavedir)
+
+            # 将渲染结果保存为mp4格式视频
             imageio.mimwrite(os.path.join(testsavedir, 'video.mp4'), to8b(rgbs), fps=30, quality=8)
 
             return
@@ -777,9 +814,19 @@ def train():
 
         # NOTE: IMPORTANT!
         ###   update learning rate   ###
+        # 设置衰减率和衰减步数
         decay_rate = 0.1
         decay_steps = args.lrate_decay * 1000
+        # 根据全局步数计算新的学习率
         new_lrate = args.lrate * (decay_rate ** (global_step / decay_steps))
+        # 更新优化器中所有参数组的学习率
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = new_lrate
+        # 注意：重要提示！
+        ### 更新学习率 ###
+        衰减率 = 0.1
+        衰减步数 = args.lrate_decay * 1000
+        新学习率 = args.lrate * (衰减率 ** (global_step / 衰减步数))
         for param_group in optimizer.param_groups:
             param_group['lr'] = new_lrate
         ################################
