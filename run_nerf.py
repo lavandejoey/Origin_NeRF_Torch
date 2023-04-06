@@ -27,9 +27,9 @@ file_handler.setFormatter(formatter)
 
 def batchify(fn, chunk):
     """构建一个适用于较小批次的'fn'的版本。
-    @:param: fn (function): 要应用的函数。
-    @:param: chunk (int): 每个批次的大小。
-    @:returns: function: 适用于较小批次的'fn'的版本。
+    @:param fn (function): 要应用的函数。
+    @:param chunk (int): 每个批次的大小。
+    @:returns function: 适用于较小批次的'fn'的版本。
     """
     if chunk is None:
         return fn
@@ -44,16 +44,16 @@ def batchify(fn, chunk):
 
 def run_network(inputs, viewdirs, fn, embed_fn, embeddirs_fn, netchunk=1024 * 64):
     """准备输入并应用网络 'fn'。
-    @:param: inputs (torch.Tensor): 输入张量，形状为 [batch_size, ... , input_ch]。
-    @:param: viewdirs (torch.Tensor): 观察方向张量，形状为 [batch_size, ... , input_ch_views]。
-    @:param: fn (torch.nn.Module): 要应用的网络模型。
-    @:param: embed_fn (function): 将输入张量嵌入到特征空间中的函数。
-    @:param: embeddirs_fn (function): 将观察方向张量嵌入到特征空间中的函数。
-    @:param: netchunk (int): 网络处理数据块大小。
-    @:returns: torch.Tensor: 经过网络 fn 处理后的输出张量，形状与输入张量相同。
+    @:param inputs (torch.Tensor): 输入张量，形状为 [batch_size, ... , input_ch]。
+    @:param viewdirs (torch.Tensor): 观察方向张量，形状为 [batch_size, ... , input_ch_views]。
+    @:param fn (torch.nn.Module): 要应用的网络模型。
+    @:param embed_fn (function): 将输入张量嵌入到特征空间中的函数。
+    @:param embeddirs_fn (function): 将观察方向张量嵌入到特征空间中的函数。
+    @:param netchunk (int): 网络处理数据块大小。
+    @:returns torch.Tensor: 经过网络 fn 处理后的输出张量，形状与输入张量相同。
     """
-    inputs_flat = torch.reshape(inputs, [-1, inputs.shape[-1]])
-    embedded = embed_fn(inputs_flat)
+    inputs_flat = torch.reshape(inputs, [-1, inputs.shape[-1]])  # 将输入张量转换为二维张量
+    embedded = embed_fn(inputs_flat)  # 将输入张量嵌入到特征空间中
 
     if viewdirs is not None:
         input_dirs = viewdirs[:, None].expand(inputs.shape)
@@ -68,10 +68,10 @@ def run_network(inputs, viewdirs, fn, embed_fn, embeddirs_fn, netchunk=1024 * 64
 
 def batchify_rays(rays_flat, chunk=1024 * 32, **kwargs):
     """将射线分成小的minibatch以避免内存不足。
-    @:param: rays_flat (torch.Tensor): 扁平化的射线张量，形状为[N, 8]，N为射线数量，8表示射线起点、方向和长度。
-    @:param: chunk (int): minibatch的大小，默认为1024*32。
-    @:param: **kwargs: 传递给render_rays函数的其他参数。
-    @:returns: dict: 包含所有渲染结果的字典，每个键值对为（名称，张量）。
+    @:param rays_flat (torch.Tensor): 扁平化的射线张量，形状为[N, 8]，N为射线数量，8表示射线起点、方向和长度。
+    @:param chunk (int): minibatch的大小，默认为1024*32。
+    @:param **kwargs: 传递给render_rays函数的其他参数。
+    @:returns dict: 包含所有渲染结果的字典，每个键值对为（名称，张量）。
     """
     all_ret = {}
     for i in range(0, rays_flat.shape[0], chunk):
@@ -88,19 +88,19 @@ def batchify_rays(rays_flat, chunk=1024 * 32, **kwargs):
 def render(H, W, K, chunk=1024 * 32, rays=None, c2w=None, ndc=True,
            near=0., far=1., use_viewdirs=False, c2w_staticcam=None, **kwargs):
     """渲染光线
-    @:param: H (int): 图像高度。
-    @:param: W (int): 图像宽度。
-    @:param: K (torch.Tensor): 相机内参矩阵，形状为[3, 3]。
-    @:param: chunk (int): minibatch的大小，默认为1024*32。
-    @:param: rays (torch.Tensor): 射线张量，形状为[2, batch_size, 3]，batch_size为射线数量，3表示射线起点、方向和长度。
-    @:param: c2w (torch.Tensor): 相机到世界坐标系的变换矩阵，形状为[3, 4]。
-    @:param: ndc (bool): 如果为True，则表示射线起点、方向在NDC坐标系中。
-    @:param: near (float or torch.Tensor): 射线最近距离。
-    @:param: far (float or torch.Tensor): 射线最远距离。
-    @:param: use_viewdirs (bool): 如果为True，则使用空间中点的观察方向。
-    @:param: c2w_staticcam (torch.Tensor): 如果不为None，则使用此变换矩阵。
-    @:param: **kwargs: 传递给render_rays函数的其他参数。
-    @:returns: dict: 包含所有渲染结果的字典，每个键值对为（名称，张量）。
+    @:param H (int): 图像高度。
+    @:param W (int): 图像宽度。
+    @:param K (torch.Tensor): 相机内参矩阵，形状为[3, 3]。
+    @:param chunk (int): minibatch的大小，默认为1024*32。
+    @:param rays (torch.Tensor): 射线张量，形状为[2, batch_size, 3]，batch_size为射线数量，3表示射线起点、方向和长度。
+    @:param c2w (torch.Tensor): 相机到世界坐标系的变换矩阵，形状为[3, 4]。
+    @:param ndc (bool): 如果为True，则表示射线起点、方向在NDC坐标系中。
+    @:param near (float or torch.Tensor): 射线最近距离。
+    @:param far (float or torch.Tensor): 射线最远距离。
+    @:param use_viewdirs (bool): 如果为True，则使用空间中点的观察方向。
+    @:param c2w_staticcam (torch.Tensor): 如果不为None，则使用此变换矩阵。
+    @:param **kwargs: 传递给render_rays函数的其他参数。
+    @:returns dict: 包含所有渲染结果的字典，每个键值对为（名称，张量）。
     """
 
     if c2w is not None:
@@ -147,15 +147,15 @@ def render(H, W, K, chunk=1024 * 32, rays=None, c2w=None, ndc=True,
 
 def render_path(render_poses, hwf, K, chunk, render_kwargs, gt_imgs=None, savedir=None, render_factor=0):
     """渲染路径
-    @:param: render_poses (list): 相机位姿列表。
-    @:param: hwf (list): 图像高度、宽度和焦距。
-    @:param: K (torch.Tensor): 相机内参矩阵，形状为[3, 3]。
-    @:param: chunk (int): minibatch的大小，默认为1024*32。
-    @:param: render_kwargs (dict): 传递给render函数的参数。
-    @:param: gt_imgs (list): 真实图像列表。
-    @:param: savedir (str): 保存渲染结果的路径。
-    @:param: render_factor (int): 渲染因子。
-    @:returns: list: 渲染结果列表。
+    @:param render_poses (list): 相机位姿列表。
+    @:param hwf (list): 图像高度、宽度和焦距。
+    @:param K (torch.Tensor): 相机内参矩阵，形状为[3, 3]。
+    @:param chunk (int): minibatch的大小，默认为1024*32。
+    @:param render_kwargs (dict): 传递给render函数的参数。
+    @:param gt_imgs (list): 真实图像列表。
+    @:param savedir (str): 保存渲染结果的路径。
+    @:param render_factor (int): 渲染因子。
+    @:returns list: 渲染结果列表。
     """
     H, W, focal = hwf  # focal为焦距
 
@@ -197,8 +197,12 @@ def render_path(render_poses, hwf, K, chunk, render_kwargs, gt_imgs=None, savedi
 
 def create_nerf(args):
     """创建NeRF的多层感知器模型
-    @:param: args (argparse.Namespace): 参数。
-    @:returns: torch.nn.Module: NeRF模型。
+    @:param args (argparse.Namespace): 参数。
+    @:return render_kwargs_train (dict): 用于训练的参数。
+    @:return render_kwargs_test (dict): 用于测试的参数。
+    @:return start (int): 训练开始的迭代次数。
+    @:return grad_vars (list): 需要计算梯度的变量列表。
+    @:return models (dict): 模型字典。
     """
     # 获取embedding函数和输入通道数(from run_nerf_helpers.py)
     embed_fn, input_ch = get_embedder(args.multires, args.i_embed)
@@ -232,9 +236,9 @@ def create_nerf(args):
         grad_vars += list(model_fine.parameters())
 
     # 定义网络查询函数
-    network_query_fn = lambda inputs, viewdirs, network_fn: run_network(inputs,  # 输入图像坐标
-                                                                        viewdirs,  # 视点方向
-                                                                        network_fn,  # 网络函数
+    network_query_fn = lambda inputs, viewdirs, network_fn: run_network(inputs=inputs,  # 输入图像坐标
+                                                                        viewdirs=viewdirs,  # 视点方向
+                                                                        fn=network_fn,  # 网络函数
                                                                         embed_fn=embed_fn,  # embedding函数
                                                                         embeddirs_fn=embeddirs_fn,  # 视点embedding函数
                                                                         netchunk=args.netchunk)  # minibatch大小
@@ -242,7 +246,7 @@ def create_nerf(args):
     # 创建优化器
     optimizer = torch.optim.Adam(params=grad_vars, lr=args.lrate, betas=(0.9, 0.999))  # Adam优化器
 
-    start = 0
+    start = 0  # start：1. 用于记录训练的步数；2. 用于记录fine-tune的步数；3. 用于记录加载的检查点的步数。
     basedir = args.basedir
     expname = args.expname
 
@@ -256,7 +260,7 @@ def create_nerf(args):
                  'tar' in f]
 
     print('Found ckpts', ckpts)
-    if len(ckpts) > 0 and not args.no_reload:
+    if len(ckpts) > 0 and not args.no_reload:  # 如果存在检查点且不禁止加载检查点，则加载最新的检查点
         ckpt_path = ckpts[-1]
         print('Reloading from', ckpt_path)
         ckpt = torch.load(ckpt_path)
@@ -270,7 +274,7 @@ def create_nerf(args):
             model_fine.load_state_dict(ckpt['network_fine_state_dict'])
 
     ##########################
-
+    # 创建渲染参数
     render_kwargs_train = {
         'network_query_fn': network_query_fn,
         'perturb': args.perturb,
@@ -310,141 +314,134 @@ def raw2outputs(raw, z_vals, rays_d, raw_noise_std=0, white_bkgd=False, pytest=F
     @:return weights: [num_rays, num_samples along ray]. 射线的权重
     @:return depth_map: [num_rays]. 射线的估计深度
     """
+    # 使用激活函数将raw转换为alpha
+    # raw:模型的预测值, dists:集成时间, act_fn:激活函数
     raw2alpha = lambda raw, dists, act_fn=F.relu: 1. - torch.exp(-act_fn(raw) * dists)
+    # 加工dists方法:将dists的最后一个元素设置为1e10
+    dists = z_vals[..., 1:] - z_vals[..., :-1]  # dists是两个集成时间之间的距离
+    # expand(dists[..., :1].shape): 将dists[..., :1]的shape扩展为dists[..., :1].shape
+    # cat: 将dists和1e10拼接在一起
+    dists = torch.cat([dists, torch.Tensor([1e10]).expand(dists[..., :1].shape)], -1)  # 将dists的最后一个元素设置为1e10
+    dists = dists * torch.norm(rays_d[..., None, :], dim=-1)  # 将dists乘以射线的方向
 
-    dists = z_vals[..., 1:] - z_vals[..., :-1]
-    dists = torch.cat([dists, torch.Tensor([1e10]).expand(dists[..., :1].shape)], -1)  # [N_rays, N_samples]
-
-    dists = dists * torch.norm(rays_d[..., None, :], dim=-1)
-
-    rgb = torch.sigmoid(raw[..., :3])  # [N_rays, N_samples, 3]
+    rgb = torch.sigmoid(raw[..., :3])
     noise = 0.
     if raw_noise_std > 0.:
         noise = torch.randn(raw[..., 3].shape) * raw_noise_std
+        if pytest:  # 如果使用pytest，则覆盖随机采样的数据
+            np.random.seed(0)  # 随机种子
+            noise = np.random.rand(*list(raw[..., 3].shape)) * raw_noise_std  # 生成随机数
+            noise = torch.Tensor(noise)  # 转换为tensor
 
-        # Overwrite randomly sampled data if pytest
-        if pytest:
-            np.random.seed(0)
-            noise = np.random.rand(*list(raw[..., 3].shape)) * raw_noise_std
-            noise = torch.Tensor(noise)
-
-    alpha = raw2alpha(raw[..., 3] + noise, dists)  # [N_rays, N_samples]
+    alpha = raw2alpha(raw[..., 3] + noise, dists)  # 将raw转换为alpha
     # weights = alpha * tf.math.cumprod(1.-alpha + 1e-10, -1, exclusive=True)
+    # 计算射线的权重, cumprod:计算累积乘积
     weights = alpha * torch.cumprod(torch.cat([torch.ones((alpha.shape[0], 1)), 1. - alpha + 1e-10], -1), -1)[:, :-1]
-    rgb_map = torch.sum(weights[..., None] * rgb, -2)  # [N_rays, 3]
+    rgb_map = torch.sum(weights[..., None] * rgb, -2)  # 计算射线的估计RGB颜色
 
     depth_map = torch.sum(weights * z_vals, -1)
     disp_map = 1. / torch.max(1e-10 * torch.ones_like(depth_map), depth_map / torch.sum(weights, -1))
     acc_map = torch.sum(weights, -1)
 
+    # 如果使用白色背景，则将rgb_map和(1. - acc_map[..., None])相加，这样就可以得到白色背景
+    # 因为acc_map是射线的透明度，acc_map越大，说明射线越透明，也就是说射线越接近白色
+    # 所以rgb_map和(1. - acc_map[..., None])相加，就可以得到白色背景
     if white_bkgd:
         rgb_map = rgb_map + (1. - acc_map[..., None])
-
     return rgb_map, disp_map, acc_map, weights, depth_map
 
 
-def render_rays(ray_batch,
-                network_fn,
-                network_query_fn,
-                N_samples,
-                retraw=False,
-                lindisp=False,
-                perturb=0.,
-                N_importance=0,
-                network_fine=None,
-                white_bkgd=False,
-                raw_noise_std=0.,
-                verbose=False,
-                pytest=False):
-        """体积渲染：从光线批次中渲染图像
-        @:param ray_batch: [batch_size, ...]. 所有必要的信息，包括：光线原点、光线方向、最小距离、最大距离和单位化的视图方向
-        @:param network_fn: 模型，用于预测每个空间点的RGB和密度
-        @:param network_query_fn: 用于将查询传递给network_fn的函数
-        @:param N_samples: int. 每条光线采样的次数
-        @:param retraw: bool. 如果为True，则包括模型的原始、未处理的预测
-        @:param lindisp: bool. 如果为True，则以相反深度的线性方式采样，而不是以深度采样
-        @:param perturb: float, 0 or 1. 如果非零，则每条光线在时间上以分层随机点采样
-        @:param N_importance: int. 每条光线额外采样的次数。这些样本仅传递给network_fine
-        @:param network_fine: "fine" 用于优化的网络：如果不为None，则使用它来重新采样光线
-        @:param white_bkgd: bool. 如果为True，则将背景设置为白色
-        @:param raw_noise_std: float. 如果不为0，则在网络输出上添加噪声
-        @:param verbose: bool. 如果为True，则打印有关渲染的信息
-        @:param pytest: bool. 如果为True，则使用固定的随机种子
-        @:return ret:
-            rgb0: rgb_map: [num_rays, 3]. 估算出的射线的RGB颜色。来自于精细模型。
-            disp0: disp_map: [num_rays]. 差距图。1/深度。
-            acc0: acc_map: [num_rays]. 沿着每条射线累积的不透明度。来自于精细模型。
-            z_std: [num_rays]. 每个样本的沿射线距离的标准偏差。N_rays = ray_batch.shape[0]
-        """
-        N_rays = ray_batch.shape[0]
-        rays_o, rays_d = ray_batch[:, 0:3], ray_batch[:, 3:6]
-        viewdirs = ray_batch[:, -3:] if ray_batch.shape[-1] > 8 else None
-        bounds = torch.reshape(ray_batch[..., 6:8], [-1, 1, 2])
-        near, far = bounds[..., 0], bounds[..., 1]  # [-1,1]
+def render_rays(ray_batch, network_fn, network_query_fn, N_samples, retraw=False, lindisp=False, perturb=0.,
+                N_importance=0, network_fine=None, white_bkgd=False, raw_noise_std=0., verbose=False, pytest=False):
+    """体积渲染：从光线批次中渲染图像
+    @:param ray_batch: [batch_size, ...]. 所有必要的信息，包括：光线原点、光线方向、最小距离、最大距离和单位化的视图方向
+    @:param network_fn: 模型，用于预测每个空间点的RGB和密度
+    @:param network_query_fn: 用于将查询传递给network_fn的函数
+    @:param N_samples: int. 每条光线采样的次数
+    @:param retraw: bool. 如果为True，则包括模型的原始、未处理的预测
+    @:param lindisp: bool. 如果为True，则以相反深度的线性方式采样，而不是以深度采样
+    @:param perturb: float, 0 or 1. 如果非零，则每条光线在时间上以分层随机点采样
+    @:param N_importance: int. 每条光线额外采样的次数。这些样本仅传递给network_fine
+    @:param network_fine: "fine" 用于优化的网络：如果不为None，则使用它来重新采样光线
+    @:param white_bkgd: bool. 如果为True，则将背景设置为白色
+    @:param raw_noise_std: float. 如果不为0，则在网络输出上添加噪声
+    @:param verbose: bool. 如果为True，则打印有关渲染的信息
+    @:param pytest: bool. 如果为True，则使用固定的随机种子
+    @:return ret:
+        rgb0: rgb_map: [num_rays, 3]. 估算出的射线的RGB颜色。来自于精细模型。
+        disp0: disp_map: [num_rays]. 差距图。1/深度。
+        acc0: acc_map: [num_rays]. 沿着每条射线累积的不透明度。来自于精细模型。
+        z_std: [num_rays]. 每个样本的沿射线距离的标准偏差。N_rays = ray_batch.shape[0]
+    """
+    N_rays = ray_batch.shape[0]
+    rays_o, rays_d = ray_batch[:, 0:3], ray_batch[:, 3:6]
+    viewdirs = ray_batch[:, -3:] if ray_batch.shape[-1] > 8 else None
+    bounds = torch.reshape(ray_batch[..., 6:8], [-1, 1, 2])
+    near, far = bounds[..., 0], bounds[..., 1]  # [-1,1]
 
-        t_vals = torch.linspace(0., 1., steps=N_samples)
-        if not lindisp:
-            z_vals = near * (1. - t_vals) + far * (t_vals)
-        else:
-            z_vals = 1. / (1. / near * (1. - t_vals) + 1. / far * (t_vals))
+    t_vals = torch.linspace(0., 1., steps=N_samples)  # t_vals是[0,1]之间的等差数列
+    if not lindisp:  # 如果不是以相反深度的线性方式采样，而是以深度采样
+        z_vals = near * (1. - t_vals) + far * (t_vals)  # 深度是[far,near]之间的等差数列
+    else:
+        z_vals = 1. / (1. / near * (1. - t_vals) + 1. / far * (t_vals))
+    z_vals = z_vals.expand([N_rays, N_samples])
+    #  z_vals是[0,1]之间的等差数列，但是是以深度的形式呈现的，而不是以相反深度的形式呈现的
 
-        z_vals = z_vals.expand([N_rays, N_samples])
+    if perturb > 0.:  # 如果perturb > 0，则在每个射线上以分层随机点采样
+        mids = .5 * (z_vals[..., 1:] + z_vals[..., :-1])  # 计算每个间隔的中间值
+        upper = torch.cat([mids, z_vals[..., -1:]], -1)  # 将最后一个z值复制到upper中
+        lower = torch.cat([z_vals[..., :1], mids], -1)  # 将第一个z值复制到lower中
+        # 在这些间隔中进行分层采样
+        t_rand = torch.rand(z_vals.shape)
 
-        if perturb > 0.:
-            # get intervals between samples
-            mids = .5 * (z_vals[..., 1:] + z_vals[..., :-1])
-            upper = torch.cat([mids, z_vals[..., -1:]], -1)
-            lower = torch.cat([z_vals[..., :1], mids], -1)
-            # stratified samples in those intervals
-            t_rand = torch.rand(z_vals.shape)
+        # 使用numpy的固定随机数覆盖u
+        if pytest:
+            np.random.seed(0)
+            t_rand = np.random.rand(*list(z_vals.shape))
+            t_rand = torch.Tensor(t_rand)
 
-            # Pytest, overwrite u with numpy's fixed random numbers
-            if pytest:
-                np.random.seed(0)
-                t_rand = np.random.rand(*list(z_vals.shape))
-                t_rand = torch.Tensor(t_rand)
+        z_vals = lower + (upper - lower) * t_rand
 
-            z_vals = lower + (upper - lower) * t_rand
+    pts = rays_o[..., None, :] + rays_d[..., None, :] * z_vals[..., :, None]
 
-        pts = rays_o[..., None, :] + rays_d[..., None, :] * z_vals[..., :, None]  # [N_rays, N_samples, 3]
+    # raw = run_network(pts)
+    raw = network_query_fn(pts, viewdirs, network_fn)
+    rgb_map, disp_map, acc_map, weights, depth_map = raw2outputs(raw, z_vals, rays_d, raw_noise_std, white_bkgd,
+                                                                 pytest=pytest)
 
-        #     raw = run_network(pts)
-        raw = network_query_fn(pts, viewdirs, network_fn)
+    if N_importance > 0:  # 如果N_importance > 0，则在每个射线上额外采样N_importance个点
+        rgb_map_0, disp_map_0, acc_map_0 = rgb_map, disp_map, acc_map  # 保存粗糙模型的结果
+
+        # 计算每个间隔的中间值
+        z_vals_mid = .5 * (z_vals[..., 1:] + z_vals[..., :-1])
+        # 在每个间隔中进行分层采样
+        z_samples = sample_pdf(z_vals_mid, weights[..., 1:-1], N_importance, det=(perturb == 0.), pytest=pytest)
+        z_samples = z_samples.detach()  # detach()函数将张量从计算图中分离出来，防止梯度传播
+
+        z_vals, _ = torch.sort(torch.cat([z_vals, z_samples], -1), -1)
+        pts = rays_o[..., None, :] + rays_d[..., None, :] * z_vals[..., :, None]
+
+        run_fn = network_fn if network_fine is None else network_fine
+        # raw = run_network(pts, fn=run_fn)
+        raw = network_query_fn(pts, viewdirs, run_fn)
+
         rgb_map, disp_map, acc_map, weights, depth_map = raw2outputs(raw, z_vals, rays_d, raw_noise_std, white_bkgd,
                                                                      pytest=pytest)
 
-        if N_importance > 0:
-            rgb_map_0, disp_map_0, acc_map_0 = rgb_map, disp_map, acc_map
+    ret = {'rgb_map': rgb_map, 'disp_map': disp_map, 'acc_map': acc_map}
+    if retraw:
+        ret['raw'] = raw
+    if N_importance > 0:
+        ret['rgb0'] = rgb_map_0
+        ret['disp0'] = disp_map_0
+        ret['acc0'] = acc_map_0
+        ret['z_std'] = torch.std(z_samples, dim=-1, unbiased=False)  # [N_rays]
 
-            z_vals_mid = .5 * (z_vals[..., 1:] + z_vals[..., :-1])
-            z_samples = sample_pdf(z_vals_mid, weights[..., 1:-1], N_importance, det=(perturb == 0.), pytest=pytest)
-            z_samples = z_samples.detach()
+    for k in ret:
+        if (torch.isnan(ret[k]).any() or torch.isinf(ret[k]).any()) and DEBUG:
+            print(f"! [Numerical Error] {k} contains nan or inf.")
 
-            z_vals, _ = torch.sort(torch.cat([z_vals, z_samples], -1), -1)
-            pts = rays_o[..., None, :] + rays_d[..., None, :] * z_vals[..., :,
-                                                                None]  # [N_rays, N_samples + N_importance, 3]
-
-            run_fn = network_fn if network_fine is None else network_fine
-            #         raw = run_network(pts, fn=run_fn)
-            raw = network_query_fn(pts, viewdirs, run_fn)
-
-            rgb_map, disp_map, acc_map, weights, depth_map = raw2outputs(raw, z_vals, rays_d, raw_noise_std, white_bkgd,
-                                                                         pytest=pytest)
-
-        ret = {'rgb_map': rgb_map, 'disp_map': disp_map, 'acc_map': acc_map}
-        if retraw:
-            ret['raw'] = raw
-        if N_importance > 0:
-            ret['rgb0'] = rgb_map_0
-            ret['disp0'] = disp_map_0
-            ret['acc0'] = acc_map_0
-            ret['z_std'] = torch.std(z_samples, dim=-1, unbiased=False)  # [N_rays]
-
-        for k in ret:
-            if (torch.isnan(ret[k]).any() or torch.isinf(ret[k]).any()) and DEBUG:
-                print(f"! [Numerical Error] {k} contains nan or inf.")
-
-        return ret
+    return ret
 
 
 def config_parser():

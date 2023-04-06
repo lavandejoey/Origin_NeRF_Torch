@@ -6,24 +6,23 @@ import json
 import torch.nn.functional as F
 import cv2
 
+trans_t = lambda t: torch.Tensor([
+    [1, 0, 0, 0],
+    [0, 1, 0, 0],
+    [0, 0, 1, t],
+    [0, 0, 0, 1]]).float()
 
-trans_t = lambda t : torch.Tensor([
-    [1,0,0,0],
-    [0,1,0,0],
-    [0,0,1,t],
-    [0,0,0,1]]).float()
+rot_phi = lambda phi: torch.Tensor([
+    [1, 0, 0, 0],
+    [0, np.cos(phi), -np.sin(phi), 0],
+    [0, np.sin(phi), np.cos(phi), 0],
+    [0, 0, 0, 1]]).float()
 
-rot_phi = lambda phi : torch.Tensor([
-    [1,0,0,0],
-    [0,np.cos(phi),-np.sin(phi),0],
-    [0,np.sin(phi), np.cos(phi),0],
-    [0,0,0,1]]).float()
-
-rot_theta = lambda th : torch.Tensor([
-    [np.cos(th),0,-np.sin(th),0],
-    [0,1,0,0],
-    [np.sin(th),0, np.cos(th),0],
-    [0,0,0,1]]).float()
+rot_theta = lambda th: torch.Tensor([
+    [np.cos(th), 0, -np.sin(th), 0],
+    [0, 1, 0, 0],
+    [np.sin(th), 0, np.cos(th), 0],
+    [0, 0, 0, 1]]).float()
 
 
 def pose_spherical(theta, phi, radius):
